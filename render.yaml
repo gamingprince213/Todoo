@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: telegram-todo-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python todo_bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false          # Render Dashboard থেকে manually সেট করবেন
+      - key: WEBHOOK_URL
+        sync: false          # Render Dashboard থেকে manually সেট করবেন
