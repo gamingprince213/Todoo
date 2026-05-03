@@ -18,20 +18,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN       = os.environ["TELEGRAM_BOT_TOKEN"]
-WEBHOOK_URL = os.environ["WEBHOOK_URL"]   # e.g. https://your-app.onrender.com
+WEBHOOK_URL = os.environ["WEBHOOK_URL"]
 PORT        = int(os.environ.get("PORT", 8443))
 
-# ─── Flask app ────────────────────────────────────────────────────────────────
 flask_app = Flask(__name__)
+ptb_app   = ApplicationBuilder().token(TOKEN).build()
 
-# ─── PTB application (module-level, initialized once) ────────────────────────
-ptb_app = ApplicationBuilder().token(TOKEN).build()
-
-# ─── In-memory storage ───────────────────────────────────────────────────────
 user_tasks: dict[int, list[dict]] = {}
+
 
 def get_tasks(user_id: int) -> list[dict]:
     return user_tasks.setdefault(user_id, [])
+
 
 def render_task_list(tasks: list[dict]) -> str:
     if not tasks:
@@ -40,6 +38,7 @@ def render_task_list(tasks: list[dict]) -> str:
         f"{'✅' if t['done'] else '🔲'} {i}. {t['text']}"
         for i, t in enumerate(tasks, 1)
     )
+
 
 def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
     tasks = get_tasks(user_id)
@@ -53,7 +52,6 @@ def main_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "👋 *To-Do Bot-এ স্বাগতম!*\n\n"
@@ -66,6 +64,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/help — সাহায্য",
         parse_mode="Markdown",
     )
+
 
 async def add_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -81,6 +80,7 @@ async def add_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=main_keyboard(user_id),
     )
 
+
 async def list_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     tasks = get_tasks(user_id)
@@ -89,6 +89,7 @@ async def list_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode="Markdown",
         reply_markup=main_keyboard(user_id) if tasks else None,
     )
+
 
 async def done_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -107,6 +108,7 @@ async def done_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=main_keyboard(user_id),
     )
 
+
 async def delete_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     tasks = get_tasks(user_id)
@@ -124,6 +126,7 @@ async def delete_task(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=main_keyboard(user_id) if tasks else None,
     )
 
+
 async def clear_done(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     tasks = get_tasks(user_id)
@@ -137,6 +140,7 @@ async def clear_done(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup=main_keyboard(user_id) if user_tasks[user_id] else None,
     )
 
+
 async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "🆘 *Help - To-Do Bot*\n\n"
@@ -147,6 +151,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/clear — সম্পন্ন সব task মুছুন",
         parse_mode="Markdown",
     )
+
 
 async def button_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -174,7 +179,6 @@ async def button_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     )
 
 
-# ─── Flask webhook route ──────────────────────────────────────────────────────
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
@@ -182,12 +186,12 @@ def webhook():
     asyncio.run(ptb_app.process_update(update))
     return "OK", 200
 
+
 @flask_app.route("/")
 def index():
     return "Bot is running!", 200
 
 
-# ─── Startup: register handlers + set webhook ─────────────────────────────────
 async def setup():
     ptb_app.add_handler(CommandHandler("start", start))
     ptb_app.add_handler(CommandHandler("add", add_task))
@@ -200,30 +204,9 @@ async def setup():
 
     await ptb_app.initialize()
     await ptb_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-    logger.info(f"✅ Webhook সেট হয়েছে: {WEBHOOK_URL}/webhook")
+    logger.info(f"Webhook সেট হয়েছে: {WEBHOOK_URL}/webhook")
 
 
 if __name__ == "__main__":
     asyncio.run(setup())
-    flask_app.run(host="0.0.0.0", port=PORT)    app.add_handler(CommandHandler("clear", clear_done))
-    app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(CallbackQueryHandler(button_handler))
-
-    await app.initialize()
-    await app.start()
-
-    await app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-    logger.info(f"Webhook সেট হয়েছে: {WEBHOOK_URL}/webhook")
-
-    await app.updater.start_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=f"{WEBHOOK_URL}/webhook",
-    )
-
-    logger.info("Bot চালু আছে...")
-    await asyncio.Event().wait()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    flask_app.run(host="0.0.0.0", port=PORT)
